@@ -29,7 +29,7 @@ gh.request("GET /repos/:owner/:repo/commits").then(console.log);
 
 Interpolation is automatic.
 
-Similarly, simple-github also accepts URI template emails (as these are common in
+Similarly, simple-github also accepts URI templates (as these are common in
 the GitHub API):
 
 ``` js
