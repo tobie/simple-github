@@ -106,9 +106,12 @@ suite('Test github API url method', function() {
     test('must default to github.BASE_URL as base url', function() {
         assert.equal(github.BASE_URL + 'foo/bar', new github.GH().url('/foo/bar'));
     });
-    test('must interpolte GH API parameters of the form: :foo', function() {
+    test('must interpolate GH API parameters of the form: :foo', function() {
         assert.equal('https://api.github.com/123/bar', new github.GH().url('/:foo/bar', { foo: 123 }));
         assert.equal('https://api.github.com/baz/123/456', new github.GH().url('/baz/:foo/:bar', { foo: 123, bar: 456 }));
+    });
+    test('must not interpolate GH API parameters in the query string', function() {
+        assert.equal('https://api.github.com/foo/bar?joe@exmaple.com+in:email', new github.GH().url('/foo/bar?joe@exmaple.com+in:email'));
     });
     test('must interpolte RFC 6570 parameters of the form: {foo}', function() {
         assert.equal('https://api.github.com/123/bar', new github.GH().url('/{foo}/bar', { foo: 123 }));

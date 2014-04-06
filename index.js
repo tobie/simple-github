@@ -132,11 +132,13 @@ GH.prototype.url = function url(url, options) {
     
     // Handle urls found in the GitHub API doc of the form:
     // //repos/:user/:repo/commits
-    url = url.replace(/:([a-z-_]+)/gi, function(m, m1) {
+    url = url.split("?");
+    url[0] = url[0].replace(/:([a-z-_]+)/gi, function(m, m1) {
         return options[m1];
     });
+    url = url.join("?");
     
-    // Handle RFC 6570 urls, e.g.: /foo/{bar}/
+    // Handle RFC 6570 urls, e.g.: /foo{/bar/}
     url = uriTemplate.parse(url).expand(options);
     return urlModule.resolve(baseURL, url);
 };
