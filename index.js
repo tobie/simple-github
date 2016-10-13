@@ -48,10 +48,10 @@ GH.prototype.request = function(url, options) {
         url = options.url || options.uri;
     }
     options = this.mergeOptions(options);
-    url = this.url(url, options);
     var self = this;
     var headers = this.headers();
     var method =  this.method(url, options);
+    url = this.url(url, options);
     var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
     var deferred = q.defer();
     var output;
@@ -84,7 +84,6 @@ GH.prototype.request = function(url, options) {
             deferred.reject(errFrom(responseBody, url));
         }
     }
-
     request({
         url: url,
         headers: headers,
