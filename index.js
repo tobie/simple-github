@@ -97,6 +97,12 @@ GH.prototype.headers = function headers() {
     var options = this.options,
         headers = {};
     
+    if (options.headers) {
+        for (var k in options.headers) {
+            headers[k] = options.headers[k];
+        }
+    }
+
     if (options.token) {
         headers["Authorization"] = "token " + options.token.replace(/token\s+/, "");
     }

@@ -73,6 +73,12 @@ suite('Test github API parseLinkHeader method', function() {
 
 
 suite('Test github API header method', function() {
+    test('must allow setting headers with options.headers.', function() {
+        assert.equal("image/png", new github.GH({
+            headers: { "Content-Type": "image/png" }
+        }).headers()["Content-Type"]);
+    });
+    
     test('must always output an object', function() {
         assert.equal("object", typeof new github.GH().headers());
         assert.equal("object", typeof new github.GH({foo: "123"}).headers());
