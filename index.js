@@ -55,6 +55,16 @@ GH.prototype.request = function(url, options) {
     var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
     var deferred = q.defer();
     var output;
+    if (this.options.debug) {
+        var _headers = Object.keys(headers).map(function(k) {
+            var v = "    " + k + ": " + headers[k];
+            var first = v.substr(0, 82);
+            v = v.substr(82).split(/(.{74})/);
+            v.unshift(first);
+            return v.filter(function(s) { return s; }).join(" \\\n        ");
+        }).join("\n");
+        console.log(method.toUpperCase() + " " + url + "\n" + _headers);
+    }
 
     function onResponse(err, response, responseBody) {
         if (err) {
