@@ -56,6 +56,7 @@ GH.prototype.request = function(url, options) {
     var deferred = q.defer();
     var output;
     var debug = options.debug;
+    var limit = options.limit || 0;
     if (debug) { log("", method, url, headers); }
 
     function onResponse(err, response, responseBody) {
@@ -73,7 +74,10 @@ GH.prototype.request = function(url, options) {
                 output.push.apply(output, responseBody);
                 link = self.parseLinkHeader(link);
                 deferred.notify(responseBody);
-                if (link.next) {
+                if (limit > 0 && output.length > limit) {
+                    output.length = limit;
+                    deferred.resolve(output);
+                } else if (link.next) {
                     request({
                         url: link.next,
                         headers: headers,
