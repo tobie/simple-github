@@ -1,6 +1,7 @@
 "use strict";
 
-var EventEmitter = require("events"),
+var util = require("util"),
+    EventEmitter = require("events"),
     request = require("request"),
     urlModule = require("url"),
     uriTemplate = require('uritemplate'),
@@ -49,7 +50,6 @@ GH.prototype.mergeOptions = function mergeOptions(options) {
 
     return output;
 };
-
 
 GH.prototype.request = function(url, options) {
     if (typeof url == "object") {
@@ -109,6 +109,25 @@ GH.prototype.request = function(url, options) {
     return deferred.promise;
 };
 
+function GHEmitter(options) {
+    this.stopped = false;
+    this.count = 0;
+    this.limit = options.limit;
+    EventEmitter.call(this);
+}
+
+util.inherits(GHEmitter, EventEmitter);
+
+GHEmitter.prototype.stop = function() {
+    this.stopped = true;
+    EventEmitter.prototype.emit.call(this, "end");
+};
+
+GHEmitter.prototype.emit = function() {
+    if (this.stopped) return;
+    EventEmitter.prototype.emit.apply(this, arguments);
+};
+
 GH.prototype.requestList = function(url, options) {
     if (typeof url == "object") {
         options = url;
@@ -119,8 +138,7 @@ GH.prototype.requestList = function(url, options) {
     var headers = this.headers();
     var method =  this.method(url, options);
     url = this.url(url, options);
-    var emitter = new EventEmitter();
-    var count = 0;
+    var emitter = new GHEmitter(options);
     if (options.debug) { log("", method, url, headers); }
 
     function onResponse(err, response, responseBody) {
@@ -138,20 +156,22 @@ GH.prototype.requestList = function(url, options) {
             }
             responseBody = JSON.parse(responseBody);
             link = self.parseLinkHeader(link);
-            while (count < options.limit && responseBody.length) {
-                count++;
+            while (!emitter.stopped && emitter.count < options.limit && responseBody.length) {
+                emitter.count++;
                 emitter.emit("data", responseBody.shift());
             }
-            if (count >= options.limit || !link.next) {
-                emitter.emit("end");
-            } else {
-                request({
-                    url: link.next,
-                    headers: headers,
-                    method: method,
-                    body: body
-                }, onResponse);
+            if (emitter.stopped) {
+                return;
             }
+            if (emitter.count >= options.limit || !link.next) {
+                emitter.emit("end");
+                return;
+            }
+            request({
+                url: link.next,
+                headers: headers,
+                method: method
+            }, onResponse);
         } else {
             emitter.emit("error", errFrom(responseBody, url));
         }
@@ -159,8 +179,7 @@ GH.prototype.requestList = function(url, options) {
     request({
         url: url,
         headers: headers,
-        method: method,
-        body: body
+        method: method
     }, onResponse);
     return emitter;
 };
