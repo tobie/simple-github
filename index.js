@@ -76,9 +76,9 @@ GH.prototype.request = function(url, options) {
             var link = response.headers.link;
             responseBody = JSON.parse(responseBody);
             if (link) {
+                link = self.parseLinkHeader(link);
                 output = output || [];
                 output.push.apply(output, responseBody);
-                link = self.parseLinkHeader(link);
                 if (output.length >= options.limit) {
                     output.length = options.limit;
                     deferred.resolve(output);
