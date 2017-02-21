@@ -1,6 +1,7 @@
 "use strict";
 
-var request = require("request"),
+var EventEmitter = require("events"),
+    request = require("request"),
     urlModule = require("url"),
     uriTemplate = require('uritemplate'),
     q = require("q"),
@@ -106,6 +107,62 @@ GH.prototype.request = function(url, options) {
         body: body
     }, onResponse);
     return deferred.promise;
+};
+
+GH.prototype.requestList = function(url, options) {
+    if (typeof url == "object") {
+        options = url;
+        url = options.url || options.uri;
+    }
+    options = this.mergeOptions(options);
+    var self = this;
+    var headers = this.headers();
+    var method =  this.method(url, options);
+    url = this.url(url, options);
+    var emitter = new EventEmitter();
+    var count = 0;
+    if (options.debug) { log("", method, url, headers); }
+
+    function onResponse(err, response, responseBody) {
+        if (options.debug) {
+            var req = response.req;
+            log("Response for ", req.method, req.path, response.headers);
+        }
+        if (err) {
+            emitter.emit("error", err);
+        } else if (response.statusCode >= 200 && response.statusCode < 300) {
+            var link = response.headers.link;
+            if (!link) {
+                emitter.emit("error", new TypeError("Not a valid list endpoint " + url));
+                return;
+            }
+            responseBody = JSON.parse(responseBody);
+            link = self.parseLinkHeader(link);
+            while (count < options.limit && responseBody.length) {
+                count++;
+                emitter.emit("data", responseBody.shift());
+            }
+            if (count >= options.limit || !link.next) {
+                emitter.emit("end");
+            } else {
+                request({
+                    url: link.next,
+                    headers: headers,
+                    method: method,
+                    body: body
+                }, onResponse);
+            }
+        } else {
+            emitter.emit("error", errFrom(responseBody, url));
+        }
+    }
+    request({
+        url: url,
+        headers: headers,
+        method: method,
+        body: body
+    }, onResponse);
+    return emitter;
 };
 
 GH.prototype.headers = function headers() {
