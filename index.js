@@ -24,20 +24,28 @@ function GH(options) {
 
 GH.prototype.mergeOptions = function mergeOptions(options) {
     var output = {};
-    
+
     if (this.options.repo) {
         output.repo = this.options.repo;
     }
-    
+
     if (this.options.owner) {
         output.owner = this.options.owner;
     }
-    
+
+    if (this.options.debug) {
+        output.debug = this.options.debug;
+    }
+
     if (options) {
         for (var k in options) {
             output[k] = options[k];
         }
     }
+
+    // defaults
+    output.limit = output.limit || Infinity;
+
     return output;
 };
 
@@ -55,12 +63,10 @@ GH.prototype.request = function(url, options) {
     var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
     var deferred = q.defer();
     var output;
-    var debug = options.debug;
-    var limit = options.limit || 0;
-    if (debug) { log("", method, url, headers); }
+    if (options.debug) { log("", method, url, headers); }
 
     function onResponse(err, response, responseBody) {
-        if (debug) {
+        if (options.debug) {
             var req = response.req;
             log("Response for ", req.method, req.path, response.headers);
         }
@@ -74,8 +80,8 @@ GH.prototype.request = function(url, options) {
                 output.push.apply(output, responseBody);
                 link = self.parseLinkHeader(link);
                 deferred.notify(responseBody);
-                if (limit > 0 && output.length > limit) {
-                    output.length = limit;
+                if (output.length >= options.limit) {
+                    output.length = options.limit;
                     deferred.resolve(output);
                 } else if (link.next) {
                     request({
