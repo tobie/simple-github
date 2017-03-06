@@ -4,7 +4,7 @@ var util = require("util"),
     EventEmitter = require("events"),
     request = require("request"),
     urlModule = require("url"),
-    uriTemplate = require('uritemplate'),
+    URITemplate = require("urijs/src/URITemplate"),
     q = require("q"),
     pkg = require("./package");
 
@@ -60,9 +60,14 @@ GH.prototype.request = function(url, options) {
     var self = this;
     var headers = this.headers();
     var method =  this.method(url, options);
-    url = this.url(url, options);
-    var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
     var deferred = q.defer();
+    try {
+        url = this.url(url, options);
+    } catch(err) {
+        deferred.reject(err);
+        return;
+    }
+    var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
     var output;
     if (options.debug) { log("", method, url, headers); }
 
@@ -224,18 +229,21 @@ GH.prototype.url = function url(url, options) {
     if (m && m[1]) {
         url = m[1];
     }
-    var baseURL = this.options.baseURL || module.exports.BASE_URL
+    var baseURL = this.options.baseURL || module.exports.BASE_URL;
     
     // Handle urls found in the GitHub API doc of the form:
     // //repos/:user/:repo/commits
     url = url.split("?");
     url[0] = url[0].replace(/:([a-z-_]+)/gi, function(m, m1) {
-        return options[m1];
+        if (m1 in options) {
+            return options[m1];
+        }
+        throw new Error("Missing property " + m1);
     });
     url = url.join("?");
     
     // Handle RFC 6570 urls, e.g.: /foo{/bar/}
-    url = uriTemplate.parse(url).expand(options);
+    url = new URITemplate(url).expand(options, { strict: true });
     return urlModule.resolve(baseURL, url);
 };
 

@@ -14,9 +14,9 @@
     "url": "https://github.com/tobie/simple-github"
   },
   "dependencies": {
-    "request": "*",
     "q": "*",
-    "uritemplate": "*"
+    "request": "*",
+    "urijs": "1.18.9"
   },
   "keywords": [
     "github",
