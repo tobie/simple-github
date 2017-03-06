@@ -24,7 +24,7 @@ var gh = require("simple-github")({
   repo: "simple-github"
 });
 
-gh.request("GET /repos/:owner/:repo/commits").then(console.log);
+gh.request("GET /repos/:owner/:repo/pulls/:number", { number: 349 }).then(console.log);
 ```
 
 Interpolation is automatic.
