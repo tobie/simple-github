@@ -1,6 +1,6 @@
 {
   "name": "simple-github",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "A simple, request-inspired and promise-based wrapper around GitHub's API.",
   "main": "index.js",
   "directories": {
