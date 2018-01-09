@@ -129,10 +129,10 @@ GH.prototype.request = function(url, options) {
     if (options.cache) {
         options.cache.get(url).then(payload => {
             if (payload) {
-                if (options.debug) { log("", "CACHE HIT", url); }
+                if (options.debug) { console.log("CACHE HIT ", url); }
                 deferred.resolve(payload);
             } else {
-                if (options.debug) { log("", "CACHE MISS", url); }
+                if (options.debug) { console.log("CACHE MISS ", url); }
                 fetch();
             }
         }, err => deferred.reject(err));
