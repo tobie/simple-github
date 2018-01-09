@@ -38,6 +38,10 @@ GH.prototype.mergeOptions = function mergeOptions(options) {
     if (this.options.debug) {
         output.debug = this.options.debug;
     }
+    
+    if (this.options.cache) {
+        output.cache = this.options.cache;
+    }
 
     if (options) {
         for (var k in options) {
@@ -71,7 +75,7 @@ GH.prototype.request = function(url, options) {
     var output;
 
     function reportPayload(deferred, payload) {
-        if (options.cache) {
+        if (method == "get" && options.cache) {
             options.cache.set(url, payload).then(_ => {
                 deferred.resolve(payload);
             }, err => deferred.reject(err));
@@ -126,7 +130,7 @@ GH.prototype.request = function(url, options) {
         }, onResponse);
     }
     
-    if (options.cache) {
+    if (method == "get" && options.cache) {
         options.cache.get(url).then(payload => {
             if (payload) {
                 if (options.debug) { console.log("CACHE HIT ", url); }
