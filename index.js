@@ -274,9 +274,10 @@ function log(prefix, method, url, headers) {
     console.log(prefix + method.toUpperCase() + " " + url + "\n" + _headers);
 }
 
-function errFrom(body) {
+function errFrom(body, url) {
     body = JSON.parse(body);
     var err = new Error(body.message);
+    err.url = url;
     if (body.errors) { err.errors = body.errors; }
     return err;
 }
