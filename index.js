@@ -74,7 +74,7 @@ GH.prototype.request = function(url, options) {
         if (options.cache) {
             options.cache.set(url, payload).then(_ => {
                 deferred.resolve(payload);
-            });
+            }, err => deferred.reject(err));
         } else {
             deferred.resolve(payload);
         }
