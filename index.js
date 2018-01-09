@@ -69,8 +69,17 @@ GH.prototype.request = function(url, options) {
     }
     var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
     var output;
-    if (options.debug) { log("", method, url, headers); }
 
+    function reportPayload(deferred, payload) {
+        if (options.cache) {
+            options.cache.set(url, payload).then(_ => {
+                deferred.resolve(payload);
+            });
+        } else {
+            deferred.resolve(payload);
+        }
+    }
+    
     function onResponse(err, response, responseBody) {
         if (options.debug) {
             var req = response.req;
@@ -87,7 +96,7 @@ GH.prototype.request = function(url, options) {
                 output.push.apply(output, responseBody);
                 if (output.length >= options.limit) {
                     output.length = options.limit;
-                    deferred.resolve(output);
+                    reportPayload(deferred, output);
                 } else if (link.next) {
                     request({
                         url: link.next,
@@ -96,21 +105,40 @@ GH.prototype.request = function(url, options) {
                         body: body
                     }, onResponse);
                 } else {
-                    deferred.resolve(output);
+                    reportPayload(deferred, output);
                 }
             } else {
-                deferred.resolve(output || responseBody);
+                reportPayload(deferred, output || responseBody);
             }
         } else {
             deferred.reject(errFrom(responseBody, url));
         }
     }
-    request({
-        url: url,
-        headers: headers,
-        method: method,
-        body: body
-    }, onResponse);
+    
+    function fetch() {
+        if (options.debug) { log("", method, url, headers); }
+        
+        request({
+            url: url,
+            headers: headers,
+            method: method,
+            body: body
+        }, onResponse);
+    }
+    
+    if (options.cache) {
+        options.cache.get(url).then(payload => {
+            if (payload) {
+                if (options.debug) { log("", "CACHE HIT", url); }
+                deferred.resolve(payload);
+            } else {
+                if (options.debug) { log("", "CACHE MISS", url); }
+                fetch();
+            }
+        }, err => deferred.reject(err));
+    } else {
+        fetch();
+    }
     return deferred.promise;
 };
 
