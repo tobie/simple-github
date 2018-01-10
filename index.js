@@ -61,74 +61,34 @@ GH.prototype.request = function(url, options) {
             url = options.url || options.uri;
         }
         options = this.mergeOptions(options);
-        var self = this;
         var headers = this.headers(options);
         var method =  this.method(url, options);
         url = this.url(url, options);
-        var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
         var output;
-    
-        function onResponse(err, response, responseBody) {
-            if (options.debug) {
-                var req = response.req;
-                log("Response for ", req.method, req.path, response.headers);
-            }
-            if (err) {
-                reject(err);
-                return;
-            }
-            if (response.statusCode >= 200 && response.statusCode < 300) {
-                var link = response.headers.link;
-                responseBody = JSON.parse(responseBody);
-                if (link) {
-                    link = self.parseLinkHeader(link);
-                    output = output || [];
-                    output.push.apply(output, responseBody);
-                    if (output.length >= options.limit) {
-                        output.length = options.limit;
-                        resolve(output);
-                    } else if (link.next) {
-                        request({
-                            url: link.next,
-                            headers: headers,
-                            method: method,
-                            body: body
-                        }, onResponse);
-                    } else {
-                        resolve(output);
-                    }
-                } else {
-                    resolve(output || responseBody);
-                }
-            } else {
-                reject(errFrom(responseBody, url));
-            }
-        }
-    
-        function fetch() {
-            if (options.debug) { log("", method, url, headers); }
         
-            request({
-                url: url,
-                headers: headers,
-                method: method,
-                body: body
-            }, onResponse);
-        }
-    
-        if (method == "get" && options.cache) {
-            options.cache.get(url).then(payload => {
-                if (payload) {
-                    if (options.debug) { console.log("CACHE HIT ", url); }
-                    resolve(payload);
-                } else {
-                    if (options.debug) { console.log("CACHE MISS ", url); }
-                    fetch();
-                }
-            }, reject);
-        } else {
-            fetch();
-        }
+        const onresponse = response => {
+            var link = response.headers.link;
+            if (!link) {
+                return output || response.body;
+            }
+            
+            link = this.parseLinkHeader(link);
+            output = output || [];
+            output.push.apply(output, response.body);
+            
+            if (output.length >= options.limit) {
+                output.length = options.limit;
+                return output;
+            }
+            
+            if (link.next) {
+                return this.httpRequest(method, link.next, headers, options.body, options).then(onresponse);
+            }
+            
+            return output;
+        };
+        
+        return this.httpRequest(method, url, headers, options.body, options).then(onresponse);
     });
 };
 
@@ -157,53 +117,36 @@ GH.prototype.requestList = function(url, options) {
         url = options.url || options.uri;
     }
     options = this.mergeOptions(options);
-    var self = this;
     var headers = this.headers(options);
     var method =  this.method(url, options);
     url = this.url(url, options);
     var emitter = new GHEmitter(options);
-    if (options.debug) { log("", method, url, headers); }
+    
+    const onerror = err => emitter.emit("error", err);
 
-    function onResponse(err, response, responseBody) {
-        if (options.debug) {
-            var req = response.req;
-            log("Response for ", req.method, req.path, response.headers);
+    const onresponse = (response) => {
+        var link = response.headers.link;
+        if (!link) {
+            emitter.emit("error", new TypeError("Not a valid list endpoint " + url));
+            return;
         }
-        if (err) {
-            emitter.emit("error", err);
-        } else if (response.statusCode >= 200 && response.statusCode < 300) {
-            var link = response.headers.link;
-            if (!link) {
-                emitter.emit("error", new TypeError("Not a valid list endpoint " + url));
-                return;
-            }
-            responseBody = JSON.parse(responseBody);
-            link = self.parseLinkHeader(link);
-            while (!emitter.stopped && emitter.count < options.limit && responseBody.length) {
-                emitter.count++;
-                emitter.emit("data", responseBody.shift());
-            }
-            if (emitter.stopped) {
-                return;
-            }
-            if (emitter.count >= options.limit || !link.next) {
-                emitter.emit("end");
-                return;
-            }
-            request({
-                url: link.next,
-                headers: headers,
-                method: method
-            }, onResponse);
-        } else {
-            emitter.emit("error", errFrom(responseBody, url));
+        link = this.parseLinkHeader(link);
+        while (!emitter.stopped && emitter.count < options.limit && response.body.length) {
+            emitter.count++;
+            emitter.emit("data", response.body.shift());
         }
-    }
-    request({
-        url: url,
-        headers: headers,
-        method: method
-    }, onResponse);
+        if (emitter.stopped) {
+            return;
+        }
+        if (emitter.count >= options.limit || !link.next) {
+            emitter.emit("end");
+            return;
+        }
+        
+        this.httpRequest(method, link.next, headers, null, options).then(onresponse, onerror);
+    };
+    
+    this.httpRequest(method, url, headers, null, options).then(onresponse, onerror);
     return emitter;
 };
 
@@ -264,6 +207,45 @@ GH.prototype.url = function url(url, options) {
     return urlModule.resolve(baseURL, url);
 };
 
+GH.prototype.httpRequest = function httpRequest(method, url, headers, body, options) {
+    if (options.debug) { log("", method, url, headers); }
+    return new Promise((resolve, reject) => {
+        let requestOptions = {
+            method: method,
+            url: url,
+            headers: headers,
+        }
+        if (body) {
+            requestOptions.body = typeof body == "object" ? JSON.stringify(body) : body;
+        }
+        
+        request(requestOptions, (err, response, responseBody) => {
+            if (options.debug) {
+                log("Response for ", method, url, response.headers);
+            }
+            if (err) {
+                reject(err);
+                return;
+            }
+            
+            responseBody = JSON.parse(responseBody); // TODO base on content type
+            
+            if (response.statusCode < 200 || response.statusCode >= 400) {
+                let err = new Error(responseBody.message);
+                err.url = url;
+                if (responseBody.errors) { err.errors = responseBody.errors; }
+                reject(err);
+                return;
+            }
+            
+            resolve({
+                headers: response.headers,
+                body: responseBody
+            });
+        });
+    });
+};
+
 GH.prototype.isHttpMethod = function isHttpMethod(method) {
     return HTTP_METHODS_REGEXP.test(toString(method));
 };
@@ -289,14 +271,6 @@ function log(prefix, method, url, headers) {
         return v.filter(function(s) { return s; }).join(" \\\n        ");
     }).join("\n");
     console.log(prefix + method.toUpperCase() + " " + url + "\n" + _headers);
-}
-
-function errFrom(body, url) {
-    body = JSON.parse(body);
-    var err = new Error(body.message);
-    err.url = url;
-    if (body.errors) { err.errors = body.errors; }
-    return err;
 }
 
 function toString(str) {
