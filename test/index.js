@@ -74,9 +74,9 @@ suite('Test github API parseLinkHeader method', function() {
 
 suite('Test github API header method', function() {
     test('must allow setting headers with options.headers.', function() {
-        assert.equal("image/png", new github.GH({
+        assert.equal("image/png", new github.GH().headers({
             headers: { "Content-Type": "image/png" }
-        }).headers()["Content-Type"]);
+        })["Content-Type"]);
     });
 
     test('must always output an object', function() {
@@ -85,7 +85,7 @@ suite('Test github API header method', function() {
     });
 
     test('must return the useragent specified in the options object', function() {
-        assert.equal("Foo", new github.GH({ userAgent: "Foo" }).headers()["User-Agent"]);
+        assert.equal("Foo", new github.GH().headers({ userAgent: "Foo" })["User-Agent"]);
     });
 
     test('must return the default userAgent if non is specified', function() {
@@ -93,7 +93,7 @@ suite('Test github API header method', function() {
     });
 
     test('must return the Authorization header if a token is specified in the options.', function() {
-        assert.equal("token bar", new github.GH({ token: "bar" }).headers()["Authorization"]);
+        assert.equal("token bar", new github.GH().headers({ token: "bar" })["Authorization"]);
     });
 
 });

@@ -5,7 +5,6 @@ var util = require("util"),
     request = require("request"),
     urlModule = require("url"),
     URITemplate = require("urijs/src/URITemplate"),
-    q = require("q"),
     pkg = require("./package");
 
 module.exports = function (options) {
@@ -56,94 +55,81 @@ GH.prototype.mergeOptions = function mergeOptions(options) {
 };
 
 GH.prototype.request = function(url, options) {
-    if (typeof url == "object") {
-        options = url;
-        url = options.url || options.uri;
-    }
-    options = this.mergeOptions(options);
-    var self = this;
-    var headers = this.headers();
-    var method =  this.method(url, options);
-    var deferred = q.defer();
-    try {
+    return new Promise((resolve, reject) => {
+        if (typeof url == "object") {
+            options = url;
+            url = options.url || options.uri;
+        }
+        options = this.mergeOptions(options);
+        var self = this;
+        var headers = this.headers(options);
+        var method =  this.method(url, options);
         url = this.url(url, options);
-    } catch(err) {
-        deferred.reject(err);
-        return;
-    }
-    var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
-    var output;
-
-    function reportPayload(deferred, payload) {
-        if (method == "get" && options.cache) {
-            options.cache.set(url, payload).then(_ => {
-                deferred.resolve(payload);
-            }, err => deferred.reject(err));
-        } else {
-            deferred.resolve(payload);
-        }
-    }
+        var body = typeof options.body == "object" ? JSON.stringify(options.body) : options.body;
+        var output;
     
-    function onResponse(err, response, responseBody) {
-        if (options.debug) {
-            var req = response.req;
-            log("Response for ", req.method, req.path, response.headers);
-        }
-        if (err) {
-            deferred.reject(err);
-        } else if (response.statusCode >= 200 && response.statusCode < 300) {
-            var link = response.headers.link;
-            responseBody = JSON.parse(responseBody);
-            if (link) {
-                link = self.parseLinkHeader(link);
-                output = output || [];
-                output.push.apply(output, responseBody);
-                if (output.length >= options.limit) {
-                    output.length = options.limit;
-                    reportPayload(deferred, output);
-                } else if (link.next) {
-                    request({
-                        url: link.next,
-                        headers: headers,
-                        method: method,
-                        body: body
-                    }, onResponse);
+        function onResponse(err, response, responseBody) {
+            if (options.debug) {
+                var req = response.req;
+                log("Response for ", req.method, req.path, response.headers);
+            }
+            if (err) {
+                reject(err);
+                return;
+            }
+            if (response.statusCode >= 200 && response.statusCode < 300) {
+                var link = response.headers.link;
+                responseBody = JSON.parse(responseBody);
+                if (link) {
+                    link = self.parseLinkHeader(link);
+                    output = output || [];
+                    output.push.apply(output, responseBody);
+                    if (output.length >= options.limit) {
+                        output.length = options.limit;
+                        resolve(output);
+                    } else if (link.next) {
+                        request({
+                            url: link.next,
+                            headers: headers,
+                            method: method,
+                            body: body
+                        }, onResponse);
+                    } else {
+                        resolve(output);
+                    }
                 } else {
-                    reportPayload(deferred, output);
+                    resolve(output || responseBody);
                 }
             } else {
-                reportPayload(deferred, output || responseBody);
+                reject(errFrom(responseBody, url));
             }
-        } else {
-            deferred.reject(errFrom(responseBody, url));
         }
-    }
     
-    function fetch() {
-        if (options.debug) { log("", method, url, headers); }
+        function fetch() {
+            if (options.debug) { log("", method, url, headers); }
         
-        request({
-            url: url,
-            headers: headers,
-            method: method,
-            body: body
-        }, onResponse);
-    }
+            request({
+                url: url,
+                headers: headers,
+                method: method,
+                body: body
+            }, onResponse);
+        }
     
-    if (method == "get" && options.cache) {
-        options.cache.get(url).then(payload => {
-            if (payload) {
-                if (options.debug) { console.log("CACHE HIT ", url); }
-                deferred.resolve(payload);
-            } else {
-                if (options.debug) { console.log("CACHE MISS ", url); }
-                fetch();
-            }
-        }, err => deferred.reject(err));
-    } else {
-        fetch();
-    }
-    return deferred.promise;
+        if (method == "get" && options.cache) {
+            options.cache.get(url).then(payload => {
+                if (payload) {
+                    if (options.debug) { console.log("CACHE HIT ", url); }
+                    resolve(payload);
+                } else {
+                    if (options.debug) { console.log("CACHE MISS ", url); }
+                    fetch();
+                }
+            }, reject);
+        } else {
+            fetch();
+        }
+    });
 };
 
 function GHEmitter(options) {
@@ -172,7 +158,7 @@ GH.prototype.requestList = function(url, options) {
     }
     options = this.mergeOptions(options);
     var self = this;
-    var headers = this.headers();
+    var headers = this.headers(options);
     var method =  this.method(url, options);
     url = this.url(url, options);
     var emitter = new GHEmitter(options);
@@ -221,10 +207,9 @@ GH.prototype.requestList = function(url, options) {
     return emitter;
 };
 
-GH.prototype.headers = function headers() {
-    var options = this.options,
-        headers = {};
-    
+GH.prototype.headers = function headers(options) {
+    var headers = {};
+    options = options || {};
     if (options.headers) {
         for (var k in options.headers) {
             headers[k] = options.headers[k];
