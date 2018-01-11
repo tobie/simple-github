@@ -92,25 +92,6 @@ GH.prototype.request = function(url, options) {
     });
 };
 
-function GHEmitter(options) {
-    this.stopped = false;
-    this.count = 0;
-    this.limit = options.limit;
-    EventEmitter.call(this);
-}
-
-util.inherits(GHEmitter, EventEmitter);
-
-GHEmitter.prototype.stop = function() {
-    this.stopped = true;
-    EventEmitter.prototype.emit.call(this, "end");
-};
-
-GHEmitter.prototype.emit = function() {
-    if (this.stopped) return;
-    EventEmitter.prototype.emit.apply(this, arguments);
-};
-
 GH.prototype.requestList = function(url, options) {
     if (typeof url == "object") {
         options = url;
@@ -219,6 +200,9 @@ GH.prototype.httpRequest = function httpRequest(method, url, headers, body, opti
             requestOptions.body = typeof body == "object" ? JSON.stringify(body) : body;
         }
         
+        if (options.cache) {
+            
+        }
         request(requestOptions, (err, response, responseBody) => {
             if (options.debug) {
                 log("Response for ", method, url, response.headers);
@@ -276,3 +260,22 @@ function log(prefix, method, url, headers) {
 function toString(str) {
     return str == null ? "" : String(str);
 }
+
+function GHEmitter(options) {
+    this.stopped = false;
+    this.count = 0;
+    this.limit = options.limit;
+    EventEmitter.call(this);
+}
+
+util.inherits(GHEmitter, EventEmitter);
+
+GHEmitter.prototype.stop = function() {
+    this.stopped = true;
+    EventEmitter.prototype.emit.call(this, "end");
+};
+
+GHEmitter.prototype.emit = function() {
+    if (this.stopped) return;
+    EventEmitter.prototype.emit.apply(this, arguments);
+};
