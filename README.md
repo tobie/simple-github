@@ -4,11 +4,7 @@ Simple GitHub
 A simple, request-inspired and promise-based wrapper around GitHub's API.
 
 The idea here is to simplify interacting with the GH API for basic scenarios.
-It uses Q promises (as promises are such a nicer abstraction then callbacks).
-It doesn't support streaming at present mostly because I didn't really need
-streaming for my use cases, and also because I'm still trying to figure out
-what the best practice is for handling streams in node.js (especially when
-these contain JSON data you want to parse).
+It uses promises (as promises are such a nicer abstraction then callbacks).
 
 The data set I'm working with and my use cases makes it so that it perfectly
 reasonable to send multiple gets and lump together the output of paginated data
